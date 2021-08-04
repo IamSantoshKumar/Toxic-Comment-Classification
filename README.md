@@ -1,6 +1,6 @@
 # Toxic-Comment-Classification
 
-I have converted the multi label problem into binary problem.
+I have converted the multi label problem into binary problem. It will classify given comments are toxic or not.
 
 Modeling : Bidirectional LSTM
 
