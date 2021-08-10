@@ -15,6 +15,32 @@ from sklearn.metrics import accuracy_score
 import warnings
 warnings.filterwarnings('ignore')
 
+stopwords = nltk.corpus.stopwords.words('english')
+def remove_stopwords(text):
+    output= [i for i in text if i not in stopwords]
+    return output
+
+porter_stemmer = PorterStemmer()
+def stemming(text):
+    stem_text = [porter_stemmer.stem(word) for word in text]
+    return stem_text
+
+def tokenization(text):
+    tokens = text.split(' ')
+    return tokens
+
+def text_to_sequences(word2idx, seq):
+    for i, sentence in enumerate(seq):
+        seq[i] = [word2idx[word] if word in word2idx else 0 for word in sentence]
+    return seq
+
+def pad_sequences(sentences, seq_len):
+    features = np.zeros((len(sentences), seq_len),dtype=int)
+    for ii, review in enumerate(sentences):
+        if len(review) != 0:
+            features[ii, -len(review):] = np.array(review)[:seq_len]
+    return features
+
 def seed_everything(seed=42):
     random.seed(seed)
     os.environ['PYTHONHASHSEED'] = str(seed)
@@ -22,9 +48,7 @@ def seed_everything(seed=42):
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     torch.backends.cudnn.deterministic = True
-    
-seed_everything(seed=42)
-     
+         
 class SentimentNet(Tesseract):
      def __init__(self, output_size, embedding_matrix, hidden_dim, n_layers, drop_prob=0.5):
          super(SentimentNet, self).__init__()
@@ -103,32 +127,6 @@ if __name__=='__main__':
 
     df = pd.read_csv(os.path.join('D:\Dataset\jigsaw','toxic_folds.csv'))
     df_valid=df.loc[df.kfold==0].reset_index(drop=True)
-
-    stopwords = nltk.corpus.stopwords.words('english')
-    def remove_stopwords(text):
-        output= [i for i in text if i not in stopwords]
-        return output
-    
-    porter_stemmer = PorterStemmer()
-    def stemming(text):
-        stem_text = [porter_stemmer.stem(word) for word in text]
-        return stem_text
-    
-    def tokenization(text):
-        tokens = text.split(' ')
-        return tokens
-
-    def text_to_sequences(word2idx, seq):
-        for i, sentence in enumerate(seq):
-            seq[i] = [word2idx[word] if word in word2idx else 0 for word in sentence]
-        return seq
-
-    def pad_sequences(sentences, seq_len):
-        features = np.zeros((len(sentences), seq_len),dtype=int)
-        for ii, review in enumerate(sentences):
-            if len(review) != 0:
-                features[ii, -len(review):] = np.array(review)[:seq_len]
-        return features
 
     embedding_matrix = joblib.load('embedding_matrix.pkl')
     word2idx = joblib.load('word2idx.pkl')
