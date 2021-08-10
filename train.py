@@ -17,6 +17,79 @@ from sklearn.metrics import accuracy_score
 import warnings
 warnings.filterwarnings('ignore')
 
+stopwords = nltk.corpus.stopwords.words('english')
+porter_stemmer = PorterStemmer()
+
+def remove_stopwords(text):
+    output= [i for i in text if i not in stopwords]
+    return output
+
+def stemming(text):
+    stem_text = [porter_stemmer.stem(word) for word in text]
+    return stem_text
+
+def tokenization(text):
+    tokens = text.split(' ')
+    return tokens
+
+def text_to_sequences(word2idx, seq):
+    for i, sentence in enumerate(seq):
+        seq[i] = [word2idx[word] if word in word2idx else 0 for word in sentence]
+    return seq
+
+def pad_sequences(sentences, seq_len):
+    features = np.zeros((len(sentences), seq_len),dtype=int)
+    for ii, review in enumerate(sentences):
+        if len(review) != 0:
+            features[ii, -len(review):] = np.array(review)[:seq_len]
+    return features
+
+def build_vocab(seq):
+    words = Counter()  
+    for i, sentence in enumerate(seq):
+        for word in sentence:  
+            words.update([word.lower()])  
+    words = {k:v for k,v in words.items() if v>1}
+    words = sorted(words, key=words.get, reverse=True)
+
+    words = ['_PAD','_UNK'] + words
+    word2idx = {o:i for i,o in enumerate(words)}
+    idx2word = {i:o for i,o in enumerate(words)}
+    return words, word2idx, idx2word
+
+def load_vectors():   
+    path_to_glove_file = os.path.join(
+        'D:\Dataset\embeddings', "glove.6B.100d.txt"
+    )
+    
+    embeddings_index = {}
+    with open(path_to_glove_file, encoding="utf8") as f:
+        for line in f:
+            word, coefs = line.split(maxsplit=1)
+            coefs = np.fromstring(coefs, "f", sep=" ")
+            embeddings_index[word] = coefs
+    
+    print("Found %s word vectors." % len(embeddings_index))
+    return embeddings_index
+        
+def create_embedding_matrix(word_index, embedding_dict, embedding_dim=100):
+    hits = 0
+    misses = 0
+    
+    # Prepare embedding matrix
+    embedding_matrix = np.zeros((len(word_index)+1, embedding_dim))
+    for word, i in word_index.items():
+        embedding_vector = embedding_dict.get(word)
+        if embedding_vector is not None:
+            # Words not found in embedding index will be all-zeros.
+            # This includes the representation for "padding" and "OOV"
+            embedding_matrix[i] = embedding_vector
+            hits += 1
+        else:
+            misses += 1
+    print("Converted %d words (%d misses)" % (hits, misses))
+    return embedding_matrix
+
 def seed_everything(seed=42):
     random.seed(seed)
     os.environ['PYTHONHASHSEED'] = str(seed)
@@ -25,7 +98,6 @@ def seed_everything(seed=42):
     torch.cuda.manual_seed(seed)
     torch.backends.cudnn.deterministic = True
     
-seed_everything(seed=42)
      
 class SentimentNet(Tesseract):
      def __init__(self, output_size, embedding_matrix, hidden_dim, n_layers, drop_prob=0.5):
@@ -104,78 +176,6 @@ if __name__=='__main__':
     df = pd.read_csv(os.path.join('D:\Dataset\jigsaw','toxic_folds.csv'))
     df_train=df.loc[df.kfold!=0].reset_index(drop=True)
     df_valid=df.loc[df.kfold==0].reset_index(drop=True)
-
-    stopwords = nltk.corpus.stopwords.words('english')
-    def remove_stopwords(text):
-        output= [i for i in text if i not in stopwords]
-        return output
-    
-    porter_stemmer = PorterStemmer()
-    def stemming(text):
-        stem_text = [porter_stemmer.stem(word) for word in text]
-        return stem_text
-    
-    def tokenization(text):
-        tokens = text.split(' ')
-        return tokens
-
-    def text_to_sequences(word2idx, seq):
-        for i, sentence in enumerate(seq):
-            seq[i] = [word2idx[word] if word in word2idx else 0 for word in sentence]
-        return seq
-
-    def pad_sequences(sentences, seq_len):
-        features = np.zeros((len(sentences), seq_len),dtype=int)
-        for ii, review in enumerate(sentences):
-            if len(review) != 0:
-                features[ii, -len(review):] = np.array(review)[:seq_len]
-        return features
-
-    def build_vocab(seq):
-        words = Counter()  
-        for i, sentence in enumerate(seq):
-            for word in sentence:  
-                words.update([word.lower()])  
-        words = {k:v for k,v in words.items() if v>1}
-        words = sorted(words, key=words.get, reverse=True)
-    
-        words = ['_PAD','_UNK'] + words
-        word2idx = {o:i for i,o in enumerate(words)}
-        idx2word = {i:o for i,o in enumerate(words)}
-        return words, word2idx, idx2word
-
-    def load_vectors():   
-        path_to_glove_file = os.path.join(
-            'D:\Dataset\embeddings', "glove.6B.100d.txt"
-        )
-        
-        embeddings_index = {}
-        with open(path_to_glove_file, encoding="utf8") as f:
-            for line in f:
-                word, coefs = line.split(maxsplit=1)
-                coefs = np.fromstring(coefs, "f", sep=" ")
-                embeddings_index[word] = coefs
-        
-        print("Found %s word vectors." % len(embeddings_index))
-        return embeddings_index
-          
-    def create_embedding_matrix(word_index, embedding_dict, embedding_dim=100):
-        hits = 0
-        misses = 0
-        
-        # Prepare embedding matrix
-        embedding_matrix = np.zeros((len(word_index)+1, embedding_dim))
-        for word, i in word_index.items():
-            embedding_vector = embedding_dict.get(word)
-            if embedding_vector is not None:
-                # Words not found in embedding index will be all-zeros.
-                # This includes the representation for "padding" and "OOV"
-                embedding_matrix[i] = embedding_vector
-                hits += 1
-            else:
-                misses += 1
-        print("Converted %d words (%d misses)" % (hits, misses))
-        return embedding_matrix
 
     df_train['clean_text']= df_train['comment_text'].str.replace('\d+', '0')
     df_train['clean_text']= df_train['clean_text'].str.replace('\W+', ' ')
